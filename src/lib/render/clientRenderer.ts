@@ -23,10 +23,9 @@ function loadScript(src: string): Promise<void> {
 async function getFFmpeg(onLog?: (msg: string) => void): Promise<any> {
   if (ffmpegInstance) return ffmpegInstance;
 
-  console.log("[ClientRenderer] Loading FFmpeg script from CDN...");
-  // Load UMD (Universal Module Definition) scripts from CDN to completely bypass Webpack bundling
-  await loadScript("https://unpkg.com/@ffmpeg/ffmpeg@0.12.15/dist/umd/ffmpeg.umd.js");
-  await loadScript("https://unpkg.com/@ffmpeg/util@0.12.2/dist/umd/index.js");
+  console.log("[ClientRenderer] Loading local FFmpeg scripts...");
+  await loadScript("/js/ffmpeg.js");
+  await loadScript("/js/ffmpeg-util.js");
 
   const { FFmpeg } = (window as any).FFmpegWasm;
   const { toBlobURL } = (window as any).FFmpegUtil;
