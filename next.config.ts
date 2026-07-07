@@ -1,7 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  serverExternalPackages: ["@remotion/renderer", "@remotion/bundler", "remotion", "@napi-rs/canvas"],
+  serverExternalPackages: ["@remotion/renderer", "@remotion/bundler", "remotion"],
   turbopack: {
     root: process.cwd(),
   },
