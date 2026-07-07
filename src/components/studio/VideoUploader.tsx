@@ -13,15 +13,23 @@ export function VideoUploader() {
     try {
       setUploadState(true, null);
       if (!file.type.startsWith("video/")) throw new Error("Upload a video file: MP4, MOV, or WebM.");
-      const metadata = await readVideoMetadata(file);
-      const form = new FormData();
-      form.append("video", file);
-      const response = await fetch("/api/upload-video", { method: "POST", body: form });
-      const payload = await response.json();
-      if (!response.ok) throw new Error(payload.error ?? "Upload failed.");
-      setVideo({ src: payload.url, fileName: file.name, width: metadata.width, height: metadata.height, durationInSeconds: metadata.durationInSeconds });
+      
+      // Load local blob URL
+      const localUrl = URL.createObjectURL(file);
+      const metadata = await readVideoMetadata(localUrl);
+
+      setVideo({
+        src: localUrl,
+        fileName: file.name,
+        width: metadata.width,
+        height: metadata.height,
+        durationInSeconds: metadata.durationInSeconds
+      });
+      
       setUploadState(false, null);
-    } catch (error) { setUploadState(false, error instanceof Error ? error.message : "Upload failed."); }
+    } catch (error) { 
+      setUploadState(false, error instanceof Error ? error.message : "Failed to load local video."); 
+    }
   }
   return (
     <section className="rounded-2xl border border-[#2c2c2e] bg-[#1c1c1e] p-4">
@@ -65,13 +73,12 @@ export function VideoUploader() {
   );
 }
 
-function readVideoMetadata(file: File): Promise<Metadata> {
+function readVideoMetadata(url: string): Promise<Metadata> {
   return new Promise((resolve, reject) => {
-    const url = URL.createObjectURL(file);
     const video = document.createElement("video");
     video.preload = "metadata";
-    video.onloadedmetadata = () => { URL.revokeObjectURL(url); resolve({ width: video.videoWidth, height: video.videoHeight, durationInSeconds: Number.isFinite(video.duration) ? video.duration : 8 }); };
-    video.onerror = () => { URL.revokeObjectURL(url); reject(new Error("Could not read video metadata.")); };
+    video.onloadedmetadata = () => { resolve({ width: video.videoWidth, height: video.videoHeight, durationInSeconds: Number.isFinite(video.duration) ? video.duration : 8 }); };
+    video.onerror = () => { reject(new Error("Could not read video metadata.")); };
     video.src = url;
   });
 }

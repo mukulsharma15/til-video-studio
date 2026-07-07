@@ -10,10 +10,6 @@ import { VideoPreviewPanel } from "./VideoPreviewPanel";
 import { VideoUploader } from "./VideoUploader";
 
 export function StudioShell() {
-  // Kick off Remotion bundle compilation immediately on page load so
-  // the first render is instant instead of waiting 30-60s to bundle.
-  useEffect(() => { fetch("/api/prewarm").catch(() => {}); }, []);
-
   return (
     <main className="min-h-screen bg-black text-[#f5f5f7]">
       <div className="relative mx-auto flex max-w-[1600px] flex-col gap-5 px-5 py-5 lg:h-screen lg:flex-row lg:overflow-hidden">
