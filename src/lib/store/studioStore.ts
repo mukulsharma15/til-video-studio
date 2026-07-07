@@ -48,7 +48,7 @@ export const useStudioStore = create<StudioStore>((set) => ({
   setUploadState: (isUploading, uploadError = null) => set({ isUploading, uploadError }),
   setVideo: (video) => {
     const transform = getCoverTransform(video, FRAME);
-    set((state) => ({ project: { ...state.project, video: { ...video, transform, trimStart: 0, trimEnd: video.durationInSeconds }, render: { ...state.project.render, durationInSeconds: Math.min(video.durationInSeconds, 30) } } }));
+    set((state) => ({ project: { ...state.project, video: { ...video, transform, trimStart: 0, trimEnd: video.durationInSeconds }, render: { ...state.project.render, durationInSeconds: Math.min(video.durationInSeconds, 60) } } }));
   },
   updateContent: (content) => set((state) => ({ project: { ...state.project, content: { ...state.project.content, ...content } } })),
   updateTransform: (transform) => set((state) => {
@@ -58,7 +58,7 @@ export const useStudioStore = create<StudioStore>((set) => ({
   }),
   updateTrim: (trimStart, trimEnd) => set((state) => {
     if (!state.project.video) return state;
-    const durationInSeconds = Math.min(trimEnd - trimStart, 30);
+    const durationInSeconds = Math.min(trimEnd - trimStart, 60);
     return {
       project: {
         ...state.project,

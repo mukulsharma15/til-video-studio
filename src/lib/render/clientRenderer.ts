@@ -302,26 +302,28 @@ export async function renderVideoClientSide(opts: ClientRenderOptions): Promise<
   await ffmpeg.writeFile("overlay.png", overlayData);
 
   // 3. Compute scale, pad, translate coordinates matching preview layout
-  const outWidth = 912;
-  const outHeight = 1648;
+  const outWidth = 540;
+  const outHeight = 960;
+  const scaleRatio = 540 / 912;
   const fps = project.render.fps;
   const trimStart = video.trimStart ?? 0;
   const trimEnd = video.trimEnd ?? video.durationInSeconds;
   const duration = trimEnd - trimStart;
 
-  const scaledW = Math.round(video.width * transform.scale);
-  const scaledH = Math.round(video.height * transform.scale);
+  const scaledW = Math.round(video.width * transform.scale * scaleRatio);
+  const scaledH = Math.round(video.height * transform.scale * scaleRatio);
   const centerX = outWidth / 2;
   const centerY = outHeight / 2;
-  const vidLeft = Math.round(centerX - scaledW / 2 + transform.x);
-  const vidTop  = Math.round(centerY - scaledH / 2 + transform.y);
+  const vidLeft = Math.round(centerX - scaledW / 2 + transform.x * scaleRatio);
+  const vidTop  = Math.round(centerY - scaledH / 2 + transform.y * scaleRatio);
 
   // 4. Construct FFmpeg filter graph (trimmed via fast-seek already, no trim filter needed)
   const filterComplex = [
     `color=black:size=${outWidth}x${outHeight}:rate=${fps}[base]`,
     `[0:v]scale=${scaledW}:${scaledH},fps=${fps}[scaled]`,
     `[base][scaled]overlay=${vidLeft}:${vidTop}:shortest=1[withvid]`,
-    `[withvid][1:v]overlay=0:0:shortest=1[out]`,
+    `[1:v]scale=${outWidth}:${outHeight}[overlay_scaled]`,
+    `[withvid][overlay_scaled]overlay=0:0:shortest=1[out]`,
   ].join(";");
 
   // Track progress from logs
@@ -346,7 +348,7 @@ export async function renderVideoClientSide(opts: ClientRenderOptions): Promise<
     "-map", "0:a?",
     "-c:a", "copy", // Copy audio directly (no re-encoding, extremely fast!)
     "-t", String(duration),
-    "-c:v", "libx264", "-preset", "ultrafast", "-b:v", "3M", "-pix_fmt", "yuv420p",
+    "-c:v", "libx264", "-preset", "ultrafast", "-b:v", "2M", "-pix_fmt", "yuv420p",
     "-movflags", "+faststart",
     "output.mp4"
   ]);
