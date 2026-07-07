@@ -74,12 +74,11 @@ async function getFFmpeg(onLog?: (msg: string) => void): Promise<any> {
     ffmpeg.on("log", ({ message }: { message: string }) => onLog(message));
   }
 
-  // Load the WASM core binaries (multi-threaded version)
-  const baseURL = "https://unpkg.com/@ffmpeg/core-mt@0.12.6/dist/esm";
+  // Load the WASM core binaries (single-threaded version)
+  const baseURL = "https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm";
   await ffmpeg.load({
     coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, "text/javascript"),
     wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, "application/wasm"),
-    workerURL: await toBlobURL(`${baseURL}/ffmpeg-core.worker.js`, "text/javascript"),
   });
 
   ffmpegInstance = ffmpeg;
@@ -348,7 +347,6 @@ export async function renderVideoClientSide(opts: ClientRenderOptions): Promise<
     "-c:a", "aac", "-b:a", "128k",
     "-t", String(duration),
     "-c:v", "libx264", "-preset", "ultrafast", "-b:v", "6M", "-pix_fmt", "yuv420p",
-    "-threads", String(navigator.hardwareConcurrency || 4), // Multi-threading
     "-movflags", "+faststart",
     "output.mp4"
   ]);

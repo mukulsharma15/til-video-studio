@@ -77,8 +77,20 @@ function readVideoMetadata(url: string): Promise<Metadata> {
   return new Promise((resolve, reject) => {
     const video = document.createElement("video");
     video.preload = "metadata";
-    video.onloadedmetadata = () => { resolve({ width: video.videoWidth, height: video.videoHeight, durationInSeconds: Number.isFinite(video.duration) ? video.duration : 8 }); };
-    video.onerror = () => { reject(new Error("Could not read video metadata.")); };
+    video.onloadedmetadata = () => {
+      // Force Chrome to seek to the end of the Blob stream to parse the correct duration
+      video.currentTime = 1e101;
+    };
+    video.onseeked = () => {
+      resolve({
+        width: video.videoWidth,
+        height: video.videoHeight,
+        durationInSeconds: Number.isFinite(video.duration) && video.duration > 0 ? video.duration : 10
+      });
+    };
+    video.onerror = () => {
+      reject(new Error("Could not read video metadata."));
+    };
     video.src = url;
   });
 }
