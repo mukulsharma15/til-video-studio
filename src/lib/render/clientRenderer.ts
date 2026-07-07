@@ -74,11 +74,11 @@ async function getFFmpeg(onLog?: (msg: string) => void): Promise<any> {
     ffmpeg.on("log", ({ message }: { message: string }) => onLog(message));
   }
 
-  // Load the WASM core binaries (local multi-threaded version)
+  // Load the WASM core binaries (single-threaded version to ensure 100% compatibility across all browsers)
+  const baseURL = "https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm";
   await ffmpeg.load({
-    coreURL: await toBlobURL("/js/ffmpeg-core.js", "text/javascript"),
-    wasmURL: await toBlobURL("/js/ffmpeg-core.wasm", "application/wasm"),
-    workerURL: await toBlobURL("/js/ffmpeg-core.worker.js", "text/javascript"),
+    coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, "text/javascript"),
+    wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, "application/wasm"),
   });
 
   ffmpegInstance = ffmpeg;
@@ -335,7 +335,7 @@ export async function renderVideoClientSide(opts: ClientRenderOptions): Promise<
     }
   });
 
-  // 5. Run WebAssembly FFmpeg encoding (uses browser multi-threaded CPU)
+  // 5. Run WebAssembly FFmpeg encoding (uses browser single-threaded CPU with copylink audio)
   await ffmpeg.exec([
     "-y",
     "-ss", String(trimStart), // Fast seek before input
@@ -344,10 +344,9 @@ export async function renderVideoClientSide(opts: ClientRenderOptions): Promise<
     "-filter_complex", filterComplex,
     "-map", "[out]",
     "-map", "0:a?",
-    "-c:a", "aac", "-b:a", "128k",
+    "-c:a", "copy", // Copy audio directly (no re-encoding, extremely fast!)
     "-t", String(duration),
-    "-c:v", "libx264", "-preset", "ultrafast", "-b:v", "6M", "-pix_fmt", "yuv420p",
-    "-threads", String(navigator.hardwareConcurrency || 4), // Multi-threading
+    "-c:v", "libx264", "-preset", "ultrafast", "-b:v", "3M", "-pix_fmt", "yuv420p",
     "-movflags", "+faststart",
     "output.mp4"
   ]);
