@@ -1,5 +1,3 @@
-import { FFmpeg } from "@ffmpeg/ffmpeg";
-import { fetchFile, toBlobURL } from "@ffmpeg/util";
 import { parseStyledText } from "./parseStyledText";
 import type { RenderableVideoProject } from "./types";
 
@@ -7,18 +5,39 @@ import type { RenderableVideoProject } from "./types";
 const W = 912;
 const H = 1648;
 
-let ffmpegInstance: FFmpeg | null = null;
+let ffmpegInstance: any = null;
 
-async function getFFmpeg(onLog?: (msg: string) => void): Promise<FFmpeg> {
+function loadScript(src: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (document.querySelector(`script[src="${src}"]`)) {
+      return resolve();
+    }
+    const script = document.createElement("script");
+    script.src = src;
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error(`Failed to load script: ${src}`));
+    document.head.appendChild(script);
+  });
+}
+
+async function getFFmpeg(onLog?: (msg: string) => void): Promise<any> {
   if (ffmpegInstance) return ffmpegInstance;
+
+  console.log("[ClientRenderer] Loading FFmpeg script from CDN...");
+  // Load UMD (Universal Module Definition) scripts from CDN to completely bypass Webpack bundling
+  await loadScript("https://unpkg.com/@ffmpeg/ffmpeg@0.12.15/dist/umd/ffmpeg.umd.js");
+  await loadScript("https://unpkg.com/@ffmpeg/util@0.12.2/dist/umd/index.js");
+
+  const { FFmpeg } = (window as any).FFmpegWasm;
+  const { toBlobURL } = (window as any).FFmpegUtil;
 
   const ffmpeg = new FFmpeg();
   
   if (onLog) {
-    ffmpeg.on("log", ({ message }) => onLog(message));
+    ffmpeg.on("log", ({ message }: { message: string }) => onLog(message));
   }
 
-  // Load from unpkg CDN (multithreaded/coop headers required)
+  // Load the WASM core binaries
   const baseURL = "https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm";
   await ffmpeg.load({
     coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, "text/javascript"),
@@ -232,6 +251,7 @@ export async function renderVideoClientSide(opts: ClientRenderOptions): Promise<
 
   onProgress(0.01);
   const ffmpeg = await getFFmpeg(onLog);
+  const { fetchFile } = (window as any).FFmpegUtil;
 
   // 1. Generate Overlay static PNG client-side
   onProgress(0.05);
@@ -270,7 +290,7 @@ export async function renderVideoClientSide(opts: ClientRenderOptions): Promise<
 
   // Track progress from logs
   let totalFrames = Math.ceil(duration * fps);
-  ffmpeg.on("log", ({ message }) => {
+  ffmpeg.on("log", ({ message }: { message: string }) => {
     const frameMatch = message.match(/frame=\s*(\d+)/);
     if (frameMatch) {
       const frame = parseInt(frameMatch[1], 10);
