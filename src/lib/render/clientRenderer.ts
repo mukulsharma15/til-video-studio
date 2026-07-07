@@ -20,22 +20,54 @@ function loadScript(src: string): Promise<void> {
   });
 }
 
+// Native implementation of @ffmpeg/util's fetchFile to bypass buggy UMD bundling
+async function fetchFile(input: string | File | Blob): Promise<Uint8Array> {
+  if (typeof input === "string") {
+    if (/data:[^;]+;base64,/.test(input)) {
+      const base64 = input.split(",")[1];
+      const binaryStr = window.atob(base64);
+      const len = binaryStr.length;
+      const bytes = new Uint8Array(len);
+      for (let i = 0; i < len; i++) {
+        bytes[i] = binaryStr.charCodeAt(i);
+      }
+      return bytes;
+    }
+    const res = await fetch(input);
+    const buf = await res.arrayBuffer();
+    return new Uint8Array(buf);
+  } else if (input instanceof File || input instanceof Blob) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        if (reader.result instanceof ArrayBuffer) {
+          resolve(new Uint8Array(reader.result));
+        } else {
+          resolve(new Uint8Array());
+        }
+      };
+      reader.onerror = () => reject(new Error("Could not read file."));
+      reader.readAsArrayBuffer(input);
+    });
+  }
+  return new Uint8Array();
+}
+
+// Native implementation of @ffmpeg/util's toBlobURL to bypass UMD constraints
+async function toBlobURL(url: string, mimeType: string): Promise<string> {
+  const res = await fetch(url);
+  const buf = await res.arrayBuffer();
+  const blob = new Blob([buf], { type: mimeType });
+  return URL.createObjectURL(blob);
+}
+
 async function getFFmpeg(onLog?: (msg: string) => void): Promise<any> {
   if (ffmpegInstance) return ffmpegInstance;
 
   console.log("[ClientRenderer] Loading local FFmpeg scripts...");
   await loadScript("/js/ffmpeg.js");
 
-  // Mock commonjs exports for the browser environment before loading ffmpeg-util
-  const win = window as any;
-  win.exports = {};
-  await loadScript("/js/ffmpeg-util.js");
-  win.FFmpegUtil = { ...win.exports };
-  delete win.exports;
-
-  const { FFmpeg } = win.FFmpegWASM;
-  const { toBlobURL } = win.FFmpegUtil;
-
+  const { FFmpeg } = (window as any).FFmpegWASM;
   const ffmpeg = new FFmpeg();
   
   if (onLog) {
@@ -256,7 +288,6 @@ export async function renderVideoClientSide(opts: ClientRenderOptions): Promise<
 
   onProgress(0.01);
   const ffmpeg = await getFFmpeg(onLog);
-  const { fetchFile } = (window as any).FFmpegUtil;
 
   // 1. Generate Overlay static PNG client-side
   onProgress(0.05);
