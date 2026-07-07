@@ -74,11 +74,12 @@ async function getFFmpeg(onLog?: (msg: string) => void): Promise<any> {
     ffmpeg.on("log", ({ message }: { message: string }) => onLog(message));
   }
 
-  // Load the WASM core binaries
-  const baseURL = "https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm";
+  // Load the WASM core binaries (multi-threaded version)
+  const baseURL = "https://unpkg.com/@ffmpeg/core-mt@0.12.6/dist/esm";
   await ffmpeg.load({
     coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, "text/javascript"),
     wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, "application/wasm"),
+    workerURL: await toBlobURL(`${baseURL}/ffmpeg-core.worker.js`, "text/javascript"),
   });
 
   ffmpegInstance = ffmpeg;
@@ -316,10 +317,10 @@ export async function renderVideoClientSide(opts: ClientRenderOptions): Promise<
   const vidLeft = Math.round(centerX - scaledW / 2 + transform.x);
   const vidTop  = Math.round(centerY - scaledH / 2 + transform.y);
 
-  // 4. Construct FFmpeg filter graph
+  // 4. Construct FFmpeg filter graph (trimmed via fast-seek already, no trim filter needed)
   const filterComplex = [
     `color=black:size=${outWidth}x${outHeight}:rate=${fps}[base]`,
-    `[0:v]trim=start=${trimStart}:end=${trimEnd},setpts=PTS-STARTPTS,scale=${scaledW}:${scaledH},fps=${fps}[scaled]`,
+    `[0:v]scale=${scaledW}:${scaledH},fps=${fps}[scaled]`,
     `[base][scaled]overlay=${vidLeft}:${vidTop}:shortest=1[withvid]`,
     `[withvid][1:v]overlay=0:0:shortest=1[out]`,
   ].join(";");
@@ -335,9 +336,10 @@ export async function renderVideoClientSide(opts: ClientRenderOptions): Promise<
     }
   });
 
-  // 5. Run WebAssembly FFmpeg encoding (uses browser CPU/threads)
+  // 5. Run WebAssembly FFmpeg encoding (uses browser multi-threaded CPU)
   await ffmpeg.exec([
     "-y",
+    "-ss", String(trimStart), // Fast seek before input
     "-i", "input.mp4",
     "-loop", "1", "-i", "overlay.png",
     "-filter_complex", filterComplex,
@@ -346,6 +348,7 @@ export async function renderVideoClientSide(opts: ClientRenderOptions): Promise<
     "-c:a", "aac", "-b:a", "128k",
     "-t", String(duration),
     "-c:v", "libx264", "-preset", "ultrafast", "-b:v", "6M", "-pix_fmt", "yuv420p",
+    "-threads", String(navigator.hardwareConcurrency || 4), // Multi-threading
     "-movflags", "+faststart",
     "output.mp4"
   ]);
