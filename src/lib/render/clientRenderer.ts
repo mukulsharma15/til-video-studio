@@ -25,10 +25,16 @@ async function getFFmpeg(onLog?: (msg: string) => void): Promise<any> {
 
   console.log("[ClientRenderer] Loading local FFmpeg scripts...");
   await loadScript("/js/ffmpeg.js");
-  await loadScript("/js/ffmpeg-util.js");
 
-  const { FFmpeg } = (window as any).FFmpegWasm;
-  const { toBlobURL } = (window as any).FFmpegUtil;
+  // Mock commonjs exports for the browser environment before loading ffmpeg-util
+  const win = window as any;
+  win.exports = {};
+  await loadScript("/js/ffmpeg-util.js");
+  win.FFmpegUtil = { ...win.exports };
+  delete win.exports;
+
+  const { FFmpeg } = win.FFmpegWASM;
+  const { toBlobURL } = win.FFmpegUtil;
 
   const ffmpeg = new FFmpeg();
   
