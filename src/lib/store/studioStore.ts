@@ -24,7 +24,7 @@ const defaultProject: VideoProject = {
     gradDark: 97,
     logoOn: true,
   },
-  render: { width: 1080, height: 1920, fps: 24, durationInSeconds: 8 },
+  render: { width: 1080, height: 1920, fps: 30, durationInSeconds: 8 },
 };
 
 type StudioStore = {
