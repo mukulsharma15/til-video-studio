@@ -1402,12 +1402,20 @@ function ensureAudioTap(){
 function recordFallback(onProgress){
   return new Promise((resolve,reject)=>{
     if(!S.vid.muted){ensureAudioTap();if(audioCtx.state==='suspended')audioCtx.resume();}
+    startVidLoop(); // ensure canvas is actively painting before capture starts
     const stream=vidCanvas.captureStream(30);
+    const vtracks=stream.getVideoTracks();
+    if(!vtracks.length){
+      reject(new Error('Browser could not capture canvas video. Try Chrome desktop.'));
+      return;
+    }
     if(!S.vid.muted&&audioDst){
       const at=audioDst.stream.getAudioTracks()[0];
       if(at)stream.addTrack(at);
     }
-    const mime=['video/mp4;codecs=avc1.42E01E,mp4a.40.2','video/mp4','video/webm;codecs=vp9,opus','video/webm']
+    /* Prefer WebM for hosted-mode fallback: several browsers advertise MP4
+       recording support but emit audio-only streams for canvas capture. */
+    const mime=['video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm','video/mp4;codecs=avc1.42E01E,mp4a.40.2','video/mp4']
       .find(t=>MediaRecorder.isTypeSupported(t))||'';
     let rec;
     try{rec=new MediaRecorder(stream,mime?{mimeType:mime,videoBitsPerSecond:8000000}:{videoBitsPerSecond:8000000});}
@@ -1434,10 +1442,15 @@ function recordFallback(onProgress){
     vidEl.addEventListener('timeupdate',onTime);
     vidEl.currentTime=S.vid.t0;
     vidEl.muted=S.vid.muted;
-    rec.start(250);
-    vidEl.play().catch(err=>{
-      if(rec.state==='recording')rec.stop();
-      reject(new Error('Playback blocked — tap Preview once, then export again.'));
+    // Prime at least one painted frame before the recorder starts.
+    requestAnimationFrame(()=>{
+      requestAnimationFrame(()=>{
+        rec.start(250);
+        vidEl.play().catch(err=>{
+          if(rec.state==='recording')rec.stop();
+          reject(new Error('Playback blocked — tap Preview once, then export again.'));
+        });
+      });
     });
   });
 }
