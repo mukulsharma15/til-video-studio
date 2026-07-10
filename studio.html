@@ -1421,12 +1421,21 @@ function recordFallback(onProgress){
     try{rec=new MediaRecorder(stream,mime?{mimeType:mime,videoBitsPerSecond:8000000}:{videoBitsPerSecond:8000000});}
     catch(e){rec=new MediaRecorder(stream);}
     const chunks=[];
+    rec.onerror=e=>reject(new Error((e&&e.error&&e.error.message)||'Recorder failed.'));
     rec.ondataavailable=e=>{if(e.data.size>0)chunks.push(e.data);};
     rec.onstop=()=>{
       vidEl.removeEventListener('timeupdate',onTime);
       vidEl.muted=true;
+      if(!chunks.length){
+        reject(new Error('No output was produced by the browser recorder.'));
+        return;
+      }
       const isMp4=mime.indexOf('mp4')>=0;
       const blob=new Blob(chunks,{type:mime||'video/webm'});
+      if(blob.size<1024){
+        reject(new Error('Recorded file is empty.'));
+        return;
+      }
       saveBlob(blob,'til-video-'+Date.now()+'.'+(isMp4?'mp4':'webm'));
       if(!isMp4)toast('Browser saved WebM (no MP4 support) — use Chrome for MP4','warn');
       resolve();
@@ -1546,15 +1555,11 @@ $('dl-video').onclick=async()=>{
       lab.textContent='Rendering with ffmpeg…';
       await renderViaFfmpeg(onP);
       toast('MP4 rendered by ffmpeg ✓');
-    }else if(webcodecsOK()&&isLocalRenderHost()){
+    }else if(webcodecsOK()){
       lab.textContent='Reading video…';
       const res=await renderDirect(onP);
       saveBlob(res.blob,'til-video-'+Date.now()+'.mp4');
       toast(res.hadAudio?'MP4 saved with sound':'MP4 saved — no audio ('+res.audioNote+')',res.hadAudio?'':'warn');
-    }else if(webcodecsOK()){
-      lab.textContent='Recording (hosted mode)…';
-      await recordFallback(onP);
-      toast('Video saved (hosted mode)');
     }else{
       lab.textContent='Recording (older browser)…';
       await recordFallback(onP);
