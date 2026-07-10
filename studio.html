@@ -1449,6 +1449,10 @@ function recordFallback(onProgress){
    if Node/HyperFrames aren't set up. Opened any other way (e.g. file://) both
    stay unavailable and the in-browser WebCodecs path below is used instead. */
 let SERVER_INFO=null;
+function isLocalRenderHost(){
+  const h=(location.hostname||'').toLowerCase();
+  return h==='localhost'||h==='127.0.0.1'||h==='::1';
+}
 async function serverInfo(){
   if(SERVER_INFO!==null)return SERVER_INFO;
   try{
@@ -1529,11 +1533,15 @@ $('dl-video').onclick=async()=>{
       lab.textContent='Rendering with ffmpeg…';
       await renderViaFfmpeg(onP);
       toast('MP4 rendered by ffmpeg ✓');
-    }else if(webcodecsOK()){
+    }else if(webcodecsOK()&&isLocalRenderHost()){
       lab.textContent='Reading video…';
       const res=await renderDirect(onP);
       saveBlob(res.blob,'til-video-'+Date.now()+'.mp4');
       toast(res.hadAudio?'MP4 saved with sound':'MP4 saved — no audio ('+res.audioNote+')',res.hadAudio?'':'warn');
+    }else if(webcodecsOK()){
+      lab.textContent='Recording (hosted mode)…';
+      await recordFallback(onP);
+      toast('Video saved (hosted mode)');
     }else{
       lab.textContent='Recording (older browser)…';
       await recordFallback(onP);
